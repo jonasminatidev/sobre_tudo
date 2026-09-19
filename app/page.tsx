@@ -15,6 +15,8 @@ import {
   SearchX,
   Sparkles,
   Edit3,
+  Trash2,
+  Layers,
   BookOpen,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -36,6 +38,18 @@ function HomeContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalParentId, setModalParentId] = useState<string | null>(null);
   const [topicToEdit, setTopicToEdit] = useState<TopicDataToEdit | null>(null);
+
+  // Helper to find topic node anywhere in tree
+  const findTopicInTree = (nodes: TopicNode[], id: string): TopicNode | null => {
+    for (const n of nodes) {
+      if (n.id === id) return n;
+      if (n.children && n.children.length > 0) {
+        const found = findTopicInTree(n.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
 
   // Fetch Tree
   const fetchTree = useCallback(async () => {
@@ -61,11 +75,25 @@ function HomeContent() {
       if (res.ok) {
         const data = await res.json();
         setActiveTopicDetail(data.topic);
+      } else {
+        // Fallback to local tree node if route detail fails
+        const fallbackNode = findTopicInTree(tree, activeTopicId);
+        if (fallbackNode) {
+          setActiveTopicDetail({
+            id: fallbackNode.id,
+            name: fallbackNode.name,
+            color: fallbackNode.color,
+            banner_image: fallbackNode.banner_image,
+            post_count: fallbackNode.total_post_count || 0,
+            children: fallbackNode.children || [],
+            breadcrumbs: [{ id: fallbackNode.id, name: fallbackNode.name, color: fallbackNode.color }],
+          });
+        }
       }
     } catch (err) {
       console.error('Erro ao carregar detalhe do tópico:', err);
     }
-  }, [activeTopicId]);
+  }, [activeTopicId, tree]);
 
   // Fetch Posts
   const fetchPosts = useCallback(async () => {
@@ -116,16 +144,44 @@ function HomeContent() {
     setIsModalOpen(true);
   };
 
-  const handleOpenEditModal = () => {
-    if (!activeTopicDetail) return;
+  const handleOpenEditModal = (targetId?: string) => {
+    const topicIdToUse = targetId || activeTopicId;
+    if (!topicIdToUse) return;
+
+    const targetNode = findTopicInTree(tree, topicIdToUse) || activeTopicDetail;
+    if (!targetNode) return;
+
     setTopicToEdit({
-      id: activeTopicDetail.id,
-      name: activeTopicDetail.name,
-      color: activeTopicDetail.color,
-      banner_image: activeTopicDetail.banner_image,
-      parent_id: activeTopicDetail.parent_id,
+      id: targetNode.id,
+      name: targetNode.name,
+      color: targetNode.color,
+      banner_image: targetNode.banner_image,
+      parent_id: targetNode.parent_id,
     });
     setIsModalOpen(true);
+  };
+
+  const handleDeleteTopic = async () => {
+    if (!activeTopicDetail) return;
+    const confirmDelete = confirm(
+      `Tem certeza que deseja excluir o tópico "${activeTopicDetail.name}"? Todas as anotações e subtópicos associados serão removidos.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      const res = await fetch(`/api/topics/${activeTopicDetail.id}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        handleSelectTopic(activeTopicDetail.parent_id || null);
+        fetchTree();
+      } else {
+        alert('Erro ao excluir tópico.');
+      }
+    } catch (err) {
+      console.error('Erro ao excluir tópico:', err);
+      alert('Erro de conexão ao excluir tópico.');
+    }
   };
 
   const theme = getCategoryTheme(activeTopicDetail?.color || 'sky');
@@ -151,9 +207,9 @@ function HomeContent() {
           />
         </div>
 
-        {/* Cabeçalho de Destaque / Banner do Tópico */}
+        {/* Cabeçalho de Destaque / Banner Dinâmico do Tópico Selecionado */}
         <div
-          className={`relative rounded-2xl border border-stone-200 overflow-hidden shadow-xs transition-all ${
+          className={`relative rounded-3xl border border-stone-200 overflow-hidden shadow-xs transition-all ${
             activeTopicDetail?.banner_image
               ? 'min-h-[220px] flex items-end'
               : `bg-gradient-to-r ${theme.bannerGradient} p-6 sm:p-8`
@@ -180,7 +236,7 @@ function HomeContent() {
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-semibold border border-white/20">
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                 <span>
-                  {activeTopicDetail ? 'Tópico Selecionado' : 'Visão Geral do Conhecimento'}
+                  {activeTopicDetail ? 'Tópico Selecionado' : 'Visão Geral do Caderno'}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight drop-shadow-xs">
@@ -189,21 +245,31 @@ function HomeContent() {
               <p className="text-xs font-mono opacity-90">
                 {activeTopicDetail
                   ? `${activeTopicDetail.post_count || 0} anotações nesta ramificação`
-                  : 'Navegue pela árvore ou busque suas anotações'}
+                  : 'Navegue pelas categorias abaixo ou busque suas anotações'}
               </p>
             </div>
 
             {/* Ações do Tópico */}
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               {activeTopicDetail && (
-                <button
-                  onClick={handleOpenEditModal}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-md text-xs font-semibold transition-all cursor-pointer border border-white/20"
-                  title="Editar cor ou capa deste tópico"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Editar Tópico</span>
-                </button>
+                <>
+                  <button
+                    onClick={() => handleOpenEditModal(activeTopicDetail.id)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-md text-xs font-semibold transition-all cursor-pointer border border-white/20"
+                    title="Editar nome, cor ou capa deste tópico"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Editar Tópico</span>
+                  </button>
+
+                  <button
+                    onClick={handleDeleteTopic}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white backdrop-blur-md text-xs font-semibold transition-all cursor-pointer border border-white/20"
+                    title="Excluir este tópico"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </>
               )}
 
               <button
@@ -219,34 +285,73 @@ function HomeContent() {
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-stone-900 text-xs font-bold shadow-md hover:bg-stone-100 active:scale-[0.98] transition-all"
               >
                 <FilePlus className="w-4 h-4" />
-                <span>Criar Conteúdo Aqui</span>
+                <span>Criar Anotação Aqui</span>
               </Link>
             </div>
           </div>
         </div>
 
-        {/* Seção de Subtópicos Imediatos (Pastas Filhas) */}
-        {activeTopicDetail && activeTopicDetail.children && activeTopicDetail.children.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider">
-              Subtópicos Imediatos ({activeTopicDetail.children.length})
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {activeTopicDetail.children.map((child: any) => (
+        {/* Visão de Raiz: Exibir Grid de Todos os Tópicos Principais */}
+        {!activeTopicId && tree.length > 0 && (
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider flex items-center gap-2">
+                <Layers className="w-4 h-4 text-stone-400" />
+                <span>Todos os Tópicos Principais ({tree.length})</span>
+              </h3>
+              <button
+                onClick={() => handleOpenNewModal(null)}
+                className="text-xs font-semibold text-stone-700 hover:text-stone-900 hover:underline"
+              >
+                + Criar Tópico Raiz
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {tree.map((cat) => (
                 <TopicFolderCard
-                  key={child.id}
-                  id={child.id}
-                  name={child.name}
-                  color={child.color}
+                  key={cat.id}
+                  id={cat.id}
+                  name={cat.name}
+                  color={cat.color}
+                  bannerImage={cat.banner_image}
+                  postCount={cat.total_post_count || 0}
+                  subtopicCount={cat.children ? cat.children.length : 0}
                   onSelect={handleSelectTopic}
+                  onEdit={(id, e) => handleOpenEditModal(id)}
                 />
               ))}
             </div>
           </div>
         )}
 
-        {/* Opção de Filtro (Incluir descendentes) */}
-        <div className="flex items-center justify-between pt-2">
+        {/* Seção de Subtópicos Imediatos (Pastas Filhas) do Tópico Ativo */}
+        {activeTopicDetail && activeTopicDetail.children && activeTopicDetail.children.length > 0 && (
+          <div className="space-y-3 pt-2">
+            <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider flex items-center gap-2">
+              <Layers className="w-4 h-4 text-stone-400" />
+              <span>Subtópicos em "{activeTopicDetail.name}" ({activeTopicDetail.children.length})</span>
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeTopicDetail.children.map((child: any) => (
+                <TopicFolderCard
+                  key={child.id}
+                  id={child.id}
+                  name={child.name}
+                  color={child.color}
+                  bannerImage={child.banner_image}
+                  postCount={child.total_post_count || child.direct_post_count || 0}
+                  subtopicCount={child.children ? child.children.length : 0}
+                  onSelect={handleSelectTopic}
+                  onEdit={(id, e) => handleOpenEditModal(id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Cabeçalho da Seção de Anotações */}
+        <div className="flex items-center justify-between pt-4 border-t border-stone-200">
           <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider">
             Anotações ({posts.length})
           </h3>
@@ -270,7 +375,7 @@ function HomeContent() {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="bg-white rounded-xl border border-stone-200 h-56 animate-pulse p-5 space-y-3"
+                className="bg-white rounded-2xl border border-stone-200 h-56 animate-pulse p-5 space-y-3"
               >
                 <div className="h-4 bg-stone-200 rounded w-1/3" />
                 <div className="h-6 bg-stone-200 rounded w-3/4" />
@@ -288,12 +393,20 @@ function HomeContent() {
           <div className="bg-white rounded-2xl border border-stone-200 p-10 text-center my-6 shadow-2xs">
             <SearchX className="w-10 h-10 text-stone-300 mx-auto mb-3" />
             <h3 className="text-base font-bold text-stone-900">
-              Nenhuma anotação neste nó
+              {activeTopicDetail ? `Nenhuma anotação em "${activeTopicDetail.name}"` : 'Nenhuma anotação encontrada'}
             </h3>
             <p className="mt-1 text-xs text-stone-500 max-w-sm mx-auto">
-              Você pode adicionar anotações neste tópico ou criar subtópicos para ramificar seu estudo.
+              Você pode adicionar anotações neste tópico ou criar subtópicos para organizar seus estudos.
             </p>
             <div className="mt-5 flex justify-center gap-3">
+              <button
+                onClick={() => handleOpenNewModal(activeTopicId)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-100 text-stone-800 text-xs font-semibold hover:bg-stone-200 transition-colors"
+              >
+                <FolderPlus className="w-4 h-4" />
+                <span>Criar Subtópico</span>
+              </button>
+
               <Link
                 href={activeTopicId ? `/novo?topic_id=${activeTopicId}` : '/novo'}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800 transition-colors shadow-2xs"
@@ -325,7 +438,7 @@ function HomeContent() {
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-stone-500">Carregando árvore de estudos...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-stone-500">Carregando caderno digital...</div>}>
       <HomeContent />
     </Suspense>
   );
