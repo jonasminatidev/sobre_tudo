@@ -1,0 +1,505 @@
+================================================================================
+ESPECIFICACAO TECNICA E ARQUITETURA: CADERNO DIGITAL DE ESTUDOS
+Stack: Next.js (App Router) + SQLite + Tailwind CSS + TipTap
+================================================================================
+
+--------------------------------------------------------------------------------
+1. IDENTIDADE VISUAL & CONCEITO DE DESIGN
+--------------------------------------------------------------------------------
+
+- Estilo Geral: Light & Vibrant Minimalist.
+  Interface em modo claro, foco em leitura confortavel, bordas refinadas e 
+  toques de cores vivas e bem demarcadas por categorias.
+
+- Paleta de Superficies:
+  * Fundo principal da pagina: stone-50 (#fafaf9) ou slate-50 (#f8fafc).
+  * Fundo dos cartoes e caixas de texto: Branco puro (#ffffff).
+  * Bordas e divisores: stone-200 (#e7e5e4).
+  * Sombras: Leves (shadow-sm), ganhando leve projecao no hover (shadow-md).
+
+- Tipografia:
+  * Titulos e leitura corrida: Sans-serif moderna e legivel (Inter ou Geist Sans).
+  * Metadados (datas, tags, contadores, codigos): Fonte Mono (JetBrains Mono / Fira Code).
+
+- Paleta Tematica por Categorias (Fundo pastel + Borda suave + Texto vibrante):
+  * Meteorologia: bg-sky-50 / border-sky-200 / text-sky-700
+  * Fisica & Ciencias: bg-indigo-50 / border-indigo-200 / text-indigo-700
+  * Engenharia & Hardware: bg-amber-50 / border-amber-200 / text-amber-700
+  * Biologia & Natureza: bg-emerald-50 / border-emerald-200 / text-emerald-700
+  * Curiosidades Gerais: bg-rose-50 / border-rose-200 / text-rose-700
+
+- Navegacao e Hierarquia:
+  * Aba horizontal superior com as Categorias Principais.
+  * Pilulas secundarias (badges) para filtrar as Subcategorias (ex: dentro de 
+    Meteorologia -> Nuvens, Frentes Frias, Pressao Atmosferica).
+
+
+--------------------------------------------------------------------------------
+2. ESTRUTURA DO BANCO DE DADOS (SQLite)
+--------------------------------------------------------------------------------
+
+Arquivo local de banco: database.sqlite
+
+SCHEMA SQL:
+
+PRAGMA foreign_keys = ON;
+
+-- Tabela 1: Categorias Principais
+CREATE TABLE IF NOT EXISTS categories (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  color TEXT DEFAULT 'sky',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabela 2: Subcategorias
+CREATE TABLE IF NOT EXISTS subcategories (
+  id TEXT PRIMARY KEY,
+  category_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+);
+
+-- Tabela 3: Postagens / Anotacoes de Conteudo
+CREATE TABLE IF NOT EXISTS posts (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  subtitle TEXT,
+  category_id TEXT NOT NULL,
+  subcategory_id TEXT,
+  content_html TEXT NOT NULL,
+  cover_image TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT,
+  FOREIGN KEY (subcategory_id) REFERENCES subcategories(id) ON DELETE SET NULL
+);
+
+-- Indices de busca e desempenho
+CREATE INDEX IF NOT EXISTS idx_posts_category ON posts(category_id);
+CREATE INDEX IF NOT EXISTS idx_posts_subcategory ON posts(subcategory_id);
+CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
+
+
+--------------------------------------------------------------------------------
+3. ESTRUTURA DE PASTAS DO PROJETO (Next.js App Router)
+--------------------------------------------------------------------------------
+
+meu-caderno-estudos/
+├── app/
+│   ├── api/
+│   │   ├── categories/
+│   │   │   └── route.ts          # GET (listar) e POST (criar categorias/subcategorias)
+│   │   ├── posts/
+│   │   │   └── route.ts          # GET (feed com filtros) e POST (salvar post)
+│   │   └── upload/
+│   │       └── route.ts          # Endpoint local para upload de fotos e prints
+│   ├── novo/
+│   │   └── page.tsx              # Tela de criacao/edicao com o editor TipTap
+│   ├── post/
+│   │   └── [id]/
+│   │       └── page.tsx          # Pagina de visualizacao completa do conteudo
+│   ├── globals.css               # Configuracoes Tailwind e tipografia
+│   ├── layout.tsx                # Shell da aplicacao (Navbar e container)
+│   └── page.tsx                  # Feed de cards com filtros de categoria
+├── components/
+│   ├── Editor/
+│   │   ├── RichTextEditor.tsx    # Instancia do TipTap com drop e colagem de prints
+│   │   └── Toolbar.tsx           # Barra de botoes estilo Word
+│   ├── CategoryFilter.tsx        # Seletor de categorias e subcategorias
+│   ├── PostCard.tsx              # Cartao colorido do feed
+│   └── ImageUploader.tsx         # Componente de Drag-and-Drop da imagem de capa
+├── lib/
+│   └── db.ts                     # Conexao e execucao de queries no SQLite (better-sqlite3)
+├── public/
+│   └── uploads/                  # Onde as imagens salvas ficam disponiveis localmente
+├── package.json
+├── tailwind.config.ts
+└── tsconfig.json
+
+DEPENDENCIAS PRINCIPAIS PARA INSTALACAO:
+npm install better-sqlite3 @tiptap/react @tiptap/pm @tiptap/starter-kit @tiptap/extension-image @tiptap/extension-text-align @tiptap/extension-underline @tiptap/extension-placeholder lucide-react clsx tailwind-merge
+npm install -D @types/better-sqlite3 @tailwindcss/typography
+
+
+--------------------------------------------------------------------------------
+4. EDITOR ESTILO WORD COM TIPTAP
+--------------------------------------------------------------------------------
+
+--- ARQUIVO: components/Editor/Toolbar.tsx ---
+
+'use client';
+
+import { Editor } from '@tiptap/react';
+import {
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  Heading1,
+  Heading2,
+  Heading3,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  List,
+  ListOrdered,
+  Image as ImageIcon,
+  Quote,
+  Undo,
+  Redo,
+} from 'lucide-react';
+import { useRef } from 'react';
+
+interface ToolbarProps {
+  editor: Editor | null;
+  onImageUpload: (file: File) => void;
+}
+
+export default function Toolbar({ editor, onImageUpload }: ToolbarProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  if (!editor) return null;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      onImageUpload(e.target.files[0]);
+    }
+  };
+
+  const btnClass = (active: boolean) =>
+    `p-1.5 rounded transition-colors ${
+      active
+        ? 'bg-stone-200 text-stone-900 font-semibold'
+        : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
+    }`;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1 border-b border-stone-200 bg-stone-50/80 p-2 text-sm">
+      {/* Historico */}
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().undo().run()}
+        disabled={!editor.can().undo()}
+        className={btnClass(false)}
+        title="Desfazer (Ctrl+Z)"
+      >
+        <Undo className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().redo().run()}
+        disabled={!editor.can().redo()}
+        className={btnClass(false)}
+        title="Refazer (Ctrl+Y)"
+      >
+        <Redo className="w-4 h-4" />
+      </button>
+
+      <div className="w-[1px] h-5 bg-stone-300 mx-1" />
+
+      {/* Titulos */}
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+        className={btnClass(editor.isActive('heading', { level: 1 }))}
+        title="Titulo Principal (H1)"
+      >
+        <Heading1 className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+        className={btnClass(editor.isActive('heading', { level: 2 }))}
+        title="Subtitulo (H2)"
+      >
+        <Heading2 className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+        className={btnClass(editor.isActive('heading', { level: 3 }))}
+        title="Secao (H3)"
+      >
+        <Heading3 className="w-4 h-4" />
+      </button>
+
+      <div className="w-[1px] h-5 bg-stone-300 mx-1" />
+
+      {/* Formatacao Basica */}
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().toggleBold().run()}
+        className={btnClass(editor.isActive('bold'))}
+        title="Negrito (Ctrl+B)"
+      >
+        <Bold className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+        className={btnClass(editor.isActive('italic'))}
+        title="Italico (Ctrl+I)"
+      >
+        <Italic className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+        className={btnClass(editor.isActive('underline'))}
+        title="Sublinhado (Ctrl+U)"
+      >
+        <UnderlineIcon className="w-4 h-4" />
+      </button>
+
+      <div className="w-[1px] h-5 bg-stone-300 mx-1" />
+
+      {/* Alinhamentos */}
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().setTextAlign('left').run()}
+        className={btnClass(editor.isActive({ textAlign: 'left' }))}
+        title="Alinhar a Esquerda"
+      >
+        <AlignLeft className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().setTextAlign('center').run()}
+        className={btnClass(editor.isActive({ textAlign: 'center' }))}
+        title="Centralizar"
+      >
+        <AlignCenter className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().setTextAlign('right').run()}
+        className={btnClass(editor.isActive({ textAlign: 'right' }))}
+        title="Alinhar a Direita"
+      >
+        <AlignRight className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+        className={btnClass(editor.isActive({ textAlign: 'justify' }))}
+        title="Justificado"
+      >
+        <AlignJustify className="w-4 h-4" />
+      </button>
+
+      <div className="w-[1px] h-5 bg-stone-300 mx-1" />
+
+      {/* Listas e Citacao */}
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+        className={btnClass(editor.isActive('bulletList'))}
+        title="Lista com Marcadores"
+      >
+        <List className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        className={btnClass(editor.isActive('orderedList'))}
+        title="Lista Numerada"
+      >
+        <ListOrdered className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        className={btnClass(editor.isActive('blockquote'))}
+        title="Citacao / Destaque"
+      >
+        <Quote className="w-4 h-4" />
+      </button>
+
+      <div className="w-[1px] h-5 bg-stone-300 mx-1" />
+
+      {/* Inserir Imagem */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="image/*"
+        onChange={handleFileChange}
+      />
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        className={btnClass(false)}
+        title="Inserir Imagem no Texto"
+      >
+        <ImageIcon className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+
+--- ARQUIVO: components/Editor/RichTextEditor.tsx ---
+
+'use client';
+
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Image from '@tiptap/extension-image';
+import TextAlign from '@tiptap/extension-text-align';
+import Underline from '@tiptap/extension-underline';
+import Placeholder from '@tiptap/extension-placeholder';
+import Toolbar from './Toolbar';
+
+interface RichTextEditorProps {
+  content: string;
+  onChange: (html: string) => void;
+}
+
+export default function RichTextEditor({ content, onChange }: RichTextEditorProps) {
+  const uploadAndInsertImage = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error('Falha no upload da imagem');
+
+      const data = await res.json();
+      if (data.url && editor) {
+        editor.chain().focus().setImage({ src: data.url }).run();
+      }
+    } catch (err) {
+      console.error('Erro no upload:', err);
+    }
+  };
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Underline,
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+      }),
+      Image.configure({
+        inline: true,
+        allowBase64: false,
+      }),
+      Placeholder.configure({
+        placeholder: 'Comece a escrever sua anotacao ou cole prints diretamente (Ctrl+V)...',
+      }),
+    ],
+    content,
+    editorProps: {
+      attributes: {
+        class:
+          'prose prose-stone max-w-none focus:outline-none min-h-[400px] p-6 text-stone-800 focus:ring-0 leading-relaxed',
+      },
+      // Suporte para Drag and Drop de imagens no meio do editor
+      handleDrop: (view, event, slice, moved) => {
+        if (!moved && event.dataTransfer?.files?.length) {
+          const file = event.dataTransfer.files[0];
+          if (file.type.startsWith('image/')) {
+            uploadAndInsertImage(file);
+            return true;
+          }
+        }
+        return false;
+      },
+      // Suporte para colar prints da area de transferencia (Ctrl + V)
+      handlePaste: (view, event) => {
+        const items = event.clipboardData?.items;
+        if (items) {
+          for (const item of Array.from(items)) {
+            if (item.type.startsWith('image/')) {
+              const file = item.getAsFile();
+              if (file) {
+                uploadAndInsertImage(file);
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      },
+    },
+    onUpdate: ({ editor }) => {
+      onChange(editor.getHTML());
+    },
+  });
+
+  return (
+    <div className="border border-stone-200 rounded-xl overflow-hidden bg-white shadow-sm focus-within:border-stone-400 transition-all">
+      <Toolbar editor={editor} onImageUpload={uploadAndInsertImage} />
+      <EditorContent editor={editor} />
+    </div>
+  );
+}
+
+
+--------------------------------------------------------------------------------
+5. API DE UPLOAD LOCAL
+--------------------------------------------------------------------------------
+
+--- ARQUIVO: app/api/upload/route.ts ---
+
+import { NextResponse } from 'next/server';
+import { writeFile, mkdir } from 'fs/promises';
+import path from 'path';
+
+export async function POST(req: Request) {
+  try {
+    const formData = await req.formData();
+    const file = formData.get('file') as File | null;
+
+    if (!file) {
+      return NextResponse.json(
+        { error: 'Nenhum arquivo enviado.' },
+        { status: 400 }
+      );
+    }
+
+    // Validacao basica de formato
+    if (!file.type.startsWith('image/')) {
+      return NextResponse.json(
+        { error: 'Apenas arquivos de imagem sao permitidos.' },
+        { status: 400 }
+      );
+    }
+
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    // Salvar fisicamente no diretorio public/uploads
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+    await mkdir(uploadDir, { recursive: true });
+
+    // Sanitiza o nome do arquivo para evitar problemas de URL
+    const sanitizedName = file.name
+      .toLowerCase()
+      .replace(/[^a-z0-9.]/g, '-');
+    const uniqueFileName = `${Date.now()}-${sanitizedName}`;
+    const destinationPath = path.join(uploadDir, uniqueFileName);
+
+    await writeFile(destinationPath, buffer);
+
+    return NextResponse.json(
+      { url: `/uploads/${uniqueFileName}` },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error('Erro na gravacao do arquivo local:', error);
+    return NextResponse.json(
+      { error: 'Erro interno ao salvar o upload local.' },
+      { status: 500 }
+    );
+  }
+}
+================================================================================
