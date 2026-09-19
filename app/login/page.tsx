@@ -1,14 +1,24 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/router';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { BookOpen, Lock, User, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('jonasdev');
+  const router = useRouter();
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberUser, setRememberUser] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Retrieve stored username from browser localStorage if previously saved
+    const savedUsername = localStorage.getItem('sobre_tudo_saved_username');
+    if (savedUsername) {
+      setUsername(savedUsername);
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,19 +26,34 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      const cleanUsername = username.trim();
+
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: cleanUsername, password }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Erro ao realizar login');
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error('Resposta inválida do servidor. Verifique sua conexão.');
       }
 
-      // Hard navigation to trigger full middleware re-evaluation and state update
+      if (!res.ok) {
+        throw new Error(data.error || 'Erro ao realizar login.');
+      }
+
+      // Save or clear username in localStorage according to user choice
+      if (rememberUser && cleanUsername) {
+        localStorage.setItem('sobre_tudo_saved_username', cleanUsername);
+      } else {
+        localStorage.removeItem('sobre_tudo_saved_username');
+      }
+
+      // Navigate to homepage
       window.location.href = '/';
     } catch (err: any) {
       setError(err.message || 'Falha na autenticação. Tente novamente.');
@@ -79,7 +104,7 @@ export default function LoginPage() {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Nome de usuário"
+                placeholder="Digite seu nome de usuário"
                 className="w-full bg-stone-50 hover:bg-stone-100/80 focus:bg-white text-stone-800 text-sm pl-11 pr-4 py-3 rounded-2xl border border-stone-200 focus:border-stone-900 focus:ring-0 outline-none transition-all placeholder:text-stone-400"
               />
             </div>
@@ -100,6 +125,18 @@ export default function LoginPage() {
                 className="w-full bg-stone-50 hover:bg-stone-100/80 focus:bg-white text-stone-800 text-sm pl-11 pr-4 py-3 rounded-2xl border border-stone-200 focus:border-stone-900 focus:ring-0 outline-none transition-all placeholder:text-stone-400"
               />
             </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-stone-600 hover:text-stone-900 transition-colors">
+              <input
+                type="checkbox"
+                checked={rememberUser}
+                onChange={(e) => setRememberUser(e.target.checked)}
+                className="w-4 h-4 rounded text-stone-900 focus:ring-stone-900 border-stone-300"
+              />
+              <span>Lembrar usuário neste navegador</span>
+            </label>
           </div>
 
           <button
