@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { BookOpen, Plus, Search, Sparkles } from 'lucide-react';
+import { BookOpen, Plus, Search, LogOut, User } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export default function Navbar() {
@@ -10,10 +10,24 @@ export default function Navbar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
     setSearchQuery(searchParams.get('search') || '');
   }, [searchParams]);
+
+  useEffect(() => {
+    if (pathname !== '/login') {
+      fetch('/api/auth/me')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.authenticated && data.user) {
+            setUsername(data.user.username);
+          }
+        })
+        .catch(() => setUsername(null));
+    }
+  }, [pathname]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,12 +38,21 @@ export default function Navbar() {
       params.delete('search');
     }
 
-    if (pathname === '/') {
-      router.push(`/?${params.toString()}`);
-    } else {
-      router.push(`/?${params.toString()}`);
+    router.push(`/?${params.toString()}`);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = '/login';
+    } catch (err) {
+      console.error('Error logging out:', err);
     }
   };
+
+  if (pathname === '/login') {
+    return null; // Don't show top navbar on login screen for clean presentation
+  }
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-stone-200">
@@ -74,8 +97,25 @@ export default function Navbar() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-900 text-white text-sm font-semibold shadow-xs hover:bg-stone-800 active:scale-[0.98] transition-all"
             >
               <Plus className="w-4 h-4" />
-              <span>Nova Anotação</span>
+              <span className="hidden sm:inline">Nova Anotação</span>
             </Link>
+
+            {username && (
+              <div className="flex items-center gap-2 border-l border-stone-200 pl-3 ml-1">
+                <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-100 text-stone-700 text-xs font-mono">
+                  <User className="w-3.5 h-3.5 text-stone-500" />
+                  <span>@{username}</span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  title="Encerrar sessão (Sair)"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-stone-600 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 text-xs font-medium transition-all"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden sm:inline">Sair</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

@@ -42,6 +42,13 @@ export interface BreadcrumbItem {
 // Initialize database schema
 export function initDb() {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS topics (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -69,7 +76,30 @@ export function initDb() {
     CREATE INDEX IF NOT EXISTS idx_posts_topic ON posts(topic_id);
     CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
   `);
+
+  // Seed root user if missing
+  const rootUser = db.prepare('SELECT id FROM users WHERE username = ?').get('jonasdev');
+  if (!rootUser) {
+    db.prepare('INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)').run(
+      'usr-root-01',
+      'jonasdev',
+      'd5f4e3e94b8f3d8d8450ad8bf4cbedd3ed49b9e90aa0378eae46886b32064400'
+    );
+  }
 }
+
+export interface UserRecord {
+  id: string;
+  username: string;
+  password_hash: string;
+  created_at: string;
+}
+
+export function getUserByUsername(username: string): UserRecord | undefined {
+  initDb();
+  return db.prepare('SELECT * FROM users WHERE username = ?').get(username) as UserRecord | undefined;
+}
+
 
 // Helper: Get Breadcrumb trail from any topic up to the root
 export function getBreadcrumbs(topicId: string): BreadcrumbItem[] {
