@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getUserByUsername } from '@/lib/db';
 import { createJwt, verifyPassword } from '@/lib/auth';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { cookies } from 'next/headers';
 
 export async function POST(req: Request) {
@@ -16,17 +17,43 @@ export async function POST(req: Request) {
     }
 
     const cleanUsername = username.trim().toLowerCase();
+    let user: { id: string; username: string; password_hash: string } | null = null;
 
-    // Look up user in database
-    let user = getUserByUsername(cleanUsername);
+    // 1. Try fetching from Supabase if configured
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, username, password_hash')
+          .eq('username', cleanUsername)
+          .maybeSingle();
 
-    // Fallback check for root user if DB lookup isn't seeded
+        if (!error && data) {
+          user = data;
+        }
+      } catch (err) {
+        console.warn('Supabase query failed, attempting local fallback:', err);
+      }
+    }
+
+    // 2. Try fetching from local SQLite if not found yet
+    if (!user) {
+      try {
+        const localUser = getUserByUsername(cleanUsername);
+        if (localUser) {
+          user = localUser;
+        }
+      } catch (err) {
+        console.warn('SQLite not available in serverless environment:', err);
+      }
+    }
+
+    // 3. Robust fallback for default root user (jonasdev)
     if (!user && cleanUsername === 'jonasdev') {
       user = {
         id: 'usr-root-01',
         username: 'jonasdev',
         password_hash: 'd5f4e3e94b8f3d8d8450ad8bf4cbedd3ed49b9e90aa0378eae46886b32064400',
-        created_at: new Date().toISOString(),
       };
     }
 
@@ -64,10 +91,10 @@ export async function POST(req: Request) {
       success: true,
       user: { id: user.id, username: user.username },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error during login:', error);
     return NextResponse.json(
-      { error: 'Erro interno durante o login.' },
+      { error: `Erro no servidor: ${error?.message || 'Falha ao autenticar.'}` },
       { status: 500 }
     );
   }
