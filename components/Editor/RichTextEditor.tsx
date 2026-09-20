@@ -8,6 +8,7 @@ import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import Toolbar from './Toolbar';
 import { useEffect } from 'react';
+import { compressImage } from '@/lib/imageCompressor';
 
 interface RichTextEditorProps {
   content: string;
@@ -21,10 +22,11 @@ export default function RichTextEditor({
   onEditorReady,
 }: RichTextEditorProps) {
   const uploadAndInsertImage = async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
+      const compressedFile = await compressImage(file);
+      const formData = new FormData();
+      formData.append('file', compressedFile);
+
       const res = await fetch('/api/upload', {
         method: 'POST',
         body: formData,

@@ -12,6 +12,7 @@ import {
   Star,
   Copy,
 } from 'lucide-react';
+import { compressImage } from '@/lib/imageCompressor';
 
 export interface UploadedImage {
   id: string;
@@ -52,10 +53,11 @@ export default function MultiImageUploader({
     const uploadedList: UploadedImage[] = [];
 
     for (const file of validFiles) {
-      const formData = new FormData();
-      formData.append('file', file);
-
       try {
+        const compressedFile = await compressImage(file);
+        const formData = new FormData();
+        formData.append('file', compressedFile);
+
         const res = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
@@ -79,11 +81,6 @@ export default function MultiImageUploader({
     if (uploadedList.length > 0) {
       const newImages = [...images, ...uploadedList];
       onImagesChange(newImages);
-
-      // Auto set first uploaded image as cover if cover is not set yet
-      if (!coverImage) {
-        onCoverImageChange(uploadedList[0].url);
-      }
     }
 
     setIsUploading(false);
@@ -101,7 +98,7 @@ export default function MultiImageUploader({
     const filtered = images.filter((img) => img.id !== id);
     onImagesChange(filtered);
     if (coverImage === url) {
-      onCoverImageChange(filtered.length > 0 ? filtered[0].url : null);
+      onCoverImageChange(null);
     }
   };
 
@@ -114,7 +111,7 @@ export default function MultiImageUploader({
             <span>Galeria de Imagens da Anotação</span>
           </h3>
           <p className="text-xs text-stone-500 mt-0.5">
-            Faça upload de várias imagens. Escolha a imagem de capa e insira imagens em locais específicos do texto usando os botões ou as marcadores <code className="bg-stone-100 px-1 py-0.5 rounded text-stone-700 font-mono">@img1</code>, <code className="bg-stone-100 px-1 py-0.5 rounded text-stone-700 font-mono">@img2</code>.
+            Faça upload de várias imagens. Escolha a imagem de capa (opcional) e insira imagens em locais específicos do texto usando os botões ou as marcadores <code className="bg-stone-100 px-1 py-0.5 rounded text-stone-700 font-mono">@img1</code>, <code className="bg-stone-100 px-1 py-0.5 rounded text-stone-700 font-mono">@img2</code>.
           </p>
         </div>
 
@@ -154,7 +151,7 @@ export default function MultiImageUploader({
             <span className="font-bold text-stone-900">Clique para selecionar várias imagens</span> ou arraste os arquivos até aqui
           </div>
           <p className="text-[11px] text-stone-400 font-mono">
-            {isUploading ? 'Enviando arquivos...' : 'Selecione várias fotos (PNG, JPG, WEBP, GIF)'}
+            {isUploading ? 'Enviando e compactando arquivos...' : 'Selecione várias fotos (PNG, JPG, WEBP, GIF)'}
           </p>
         </div>
       </div>
@@ -188,7 +185,7 @@ export default function MultiImageUploader({
                   key={img.id}
                   className={`relative rounded-xl border overflow-hidden p-2.5 bg-white transition-all flex items-center gap-3 ${
                     isCover
-                      ? 'border-stone-900 ring-2 ring-stone-900/10 shadow-xs'
+                      ? 'border-amber-500 ring-2 ring-amber-500/20 shadow-xs'
                       : 'border-stone-200 hover:border-stone-300'
                   }`}
                 >
@@ -202,9 +199,9 @@ export default function MultiImageUploader({
                     {isCover && (
                       <div
                         className="absolute top-1 left-1 bg-amber-500 text-white p-0.5 rounded-full shadow-xs"
-                        title="Imagem de Capa"
+                        title="Imagem de Capa Atual"
                       >
-                        <Star className="w-3 h-3 fill-amber-500" />
+                        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
                       </div>
                     )}
                   </div>
@@ -232,21 +229,27 @@ export default function MultiImageUploader({
                         <span>Inserir no texto</span>
                       </button>
 
-                      {/* Botão: Definir como Capa */}
+                      {/* Botão: Marcar / Desmarcar Capa */}
                       {!isCover ? (
                         <button
                           type="button"
                           onClick={() => onCoverImageChange(img.url)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-stone-100 text-stone-700 text-[11px] font-medium hover:bg-stone-200 transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-stone-100 text-stone-700 text-[11px] font-medium hover:bg-stone-200 transition-colors cursor-pointer border border-stone-200"
                           title="Definir como imagem de capa do card"
                         >
                           <Star className="w-3 h-3 text-amber-500" />
-                          <span>Capa</span>
+                          <span>Definir Capa</span>
                         </button>
                       ) : (
-                        <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                          Capa Atual
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onCoverImageChange(null)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500 text-white text-[11px] font-semibold hover:bg-amber-600 active:scale-[0.97] transition-all cursor-pointer shadow-2xs"
+                          title="Clique para desmarcar esta imagem como capa"
+                        >
+                          <Star className="w-3 h-3 fill-white text-white" />
+                          <span>Capa Atual (Desmarcar)</span>
+                        </button>
                       )}
                     </div>
                   </div>

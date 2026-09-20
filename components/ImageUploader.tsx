@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { Upload, X, Image as ImageIcon, Check } from 'lucide-react';
+import { compressImage } from '@/lib/imageCompressor';
 
 interface ImageUploaderProps {
   value?: string | null;
@@ -20,10 +21,11 @@ export default function ImageUploader({ value, onChange }: ImageUploaderProps) {
     }
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
+      const compressedFile = await compressImage(file);
+      const formData = new FormData();
+      formData.append('file', compressedFile);
+
       const res = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
