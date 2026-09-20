@@ -74,9 +74,9 @@ export async function GET(req: Request) {
       }
 
       if (search) {
-        query += ` AND (p.title LIKE ? OR p.subtitle LIKE ? OR p.content_html LIKE ?)`;
-        const searchPattern = `%${search}%`;
-        params.push(searchPattern, searchPattern, searchPattern);
+        query += ` AND (LOWER(p.title) LIKE ? OR LOWER(p.subtitle) LIKE ? OR LOWER(p.content_html) LIKE ? OR LOWER(t.name) LIKE ?)`;
+        const searchPattern = `%${search.toLowerCase()}%`;
+        params.push(searchPattern, searchPattern, searchPattern, searchPattern);
       }
 
       query += ` ORDER BY p.created_at DESC`;

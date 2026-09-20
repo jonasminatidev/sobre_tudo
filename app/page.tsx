@@ -100,7 +100,7 @@ function HomeContent() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (activeTopicId) params.set('topic_id', activeTopicId);
+      if (activeTopicId && !searchQuery) params.set('topic_id', activeTopicId);
       params.set('include_subtopics', includeSubtopics ? 'true' : 'false');
       if (searchQuery) params.set('search', searchQuery);
 
@@ -200,6 +200,35 @@ function HomeContent() {
 
       {/* Coluna Direita: Área Central de Conteúdo */}
       <div className="lg:col-span-3 space-y-6">
+        {/* Banner de Busca Ativa */}
+        {searchQuery && (
+          <div className="bg-amber-50 rounded-2xl border border-amber-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <SearchX className="w-4 h-4 text-amber-700 shrink-0" />
+              <div className="text-xs text-amber-950">
+                <span className="font-bold">Exibindo busca global por:</span>{' '}
+                <code className="bg-amber-100 px-1.5 py-0.5 rounded font-bold font-mono text-amber-900">
+                  "{searchQuery}"
+                </code>
+                <span className="ml-2 font-mono text-[11px] text-amber-700">
+                  ({posts.length} anotação/anotações encontrada(s))
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const params = new URLSearchParams(searchParams.toString());
+                params.delete('search');
+                router.push(params.toString() ? `/?${params.toString()}` : '/');
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-stone-700 hover:text-stone-900 border border-stone-200 text-xs font-semibold shadow-2xs transition-colors shrink-0 cursor-pointer"
+            >
+              <span>Limpar busca</span>
+            </button>
+          </div>
+        )}
+
         {/* Breadcrumbs */}
         <div className="bg-white rounded-2xl border border-stone-200 px-4 py-2.5 shadow-2xs">
           <Breadcrumbs
