@@ -320,31 +320,49 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Ações */}
+          {/* Ações da Header */}
           <div className="flex items-center gap-3">
-            <Link
-              href="/novo"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-900 text-white text-sm font-semibold shadow-xs hover:bg-stone-800 active:scale-[0.98] transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Nova Anotação</span>
-            </Link>
-
-            {username && (
-              <div className="flex items-center gap-2 border-l border-stone-200 pl-3 ml-1">
-                <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-stone-100 text-stone-700 text-xs font-mono">
-                  <User className="w-3.5 h-3.5 text-stone-500" />
-                  <span>@{username}</span>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  title="Encerrar sessão (Sair)"
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-stone-600 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 text-xs font-medium transition-all"
+            {username ? (
+              <>
+                <Link
+                  href="/novo"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-900 text-white text-sm font-semibold shadow-xs hover:bg-stone-800 active:scale-[0.98] transition-all"
                 >
-                  <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">Sair</span>
-                </button>
-              </div>
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Nova Anotação</span>
+                </Link>
+
+                <div className="flex items-center gap-2 border-l border-stone-200 pl-3 ml-1">
+                  <Link
+                    href="/admin"
+                    className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-colors ${
+                      pathname.startsWith('/admin')
+                        ? 'bg-amber-100 text-amber-900 font-bold border border-amber-300'
+                        : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
+                    }`}
+                    title="Ir para o Painel de Administração"
+                  >
+                    <User className="w-3.5 h-3.5 text-stone-500" />
+                    <span>Modo Admin</span>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    title="Encerrar sessão (Sair)"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-stone-600 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 text-xs font-medium transition-all cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="hidden sm:inline">Sair</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <Link
+                href="/admin"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-sm font-semibold border border-stone-200 transition-all cursor-pointer shadow-2xs"
+              >
+                <User className="w-4 h-4 text-stone-600" />
+                <span>Administração</span>
+              </Link>
             )}
           </div>
         </div>

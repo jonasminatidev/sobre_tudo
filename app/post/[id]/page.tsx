@@ -32,8 +32,24 @@ export default function PostDetailPage({
 
   const [post, setPost] = useState<PostDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    async function checkAdmin() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authenticated) setIsAdmin(true);
+        }
+      } catch {
+        setIsAdmin(false);
+      }
+    }
+    checkAdmin();
+  }, []);
 
   useEffect(() => {
     async function loadPost() {
@@ -118,22 +134,24 @@ export default function PostDetailPage({
           <Breadcrumbs items={post.breadcrumbs || []} currentTitle={post.title} />
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Link
-            href={`/post/${post.id}/editar`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 bg-white text-stone-700 text-xs font-semibold hover:bg-stone-50 hover:border-stone-300 transition-all shadow-2xs"
-          >
-            <Edit3 className="w-3.5 h-3.5 text-stone-600" />
-            <span>Editar</span>
-          </Link>
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100 transition-all shadow-2xs cursor-pointer"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Excluir</span>
-          </button>
-        </div>
+        {isAdmin && (
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href={`/post/${post.id}/editar`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 bg-white text-stone-700 text-xs font-semibold hover:bg-stone-50 hover:border-stone-300 transition-all shadow-2xs"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-stone-600" />
+              <span>Editar</span>
+            </Link>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100 transition-all shadow-2xs cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Excluir</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Cartão do Cabeçalho */}

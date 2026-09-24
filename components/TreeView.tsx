@@ -18,14 +18,14 @@ interface TreeViewProps {
   tree: TopicNode[];
   activeTopicId: string | null;
   onSelectTopic: (topicId: string | null) => void;
-  onOpenNewTopicModal: (parentId?: string | null) => void;
+  onOpenNewTopicModal?: (parentId?: string | null) => void;
 }
 
 interface TreeNodeItemProps {
   node: TopicNode;
   activeTopicId: string | null;
   onSelectTopic: (topicId: string | null) => void;
-  onOpenNewTopicModal: (parentId?: string | null) => void;
+  onOpenNewTopicModal?: (parentId?: string | null) => void;
   depth?: number;
 }
 
@@ -97,20 +97,22 @@ function TreeNodeItem({
 
         <div className="flex items-center gap-1 shrink-0 ml-1">
           {/* Botão para criar filho rápido */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenNewTopicModal(node.id);
-            }}
-            title={`Adicionar subtópico em ${node.name}`}
-            className={`opacity-0 group-hover:opacity-100 p-0.5 rounded transition-opacity ${
-              isActive
-                ? 'hover:bg-stone-800 text-stone-300'
-                : 'hover:bg-stone-200 text-stone-500'
-            }`}
-          >
-            <Plus className="w-3 h-3" />
-          </button>
+          {onOpenNewTopicModal && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenNewTopicModal(node.id);
+              }}
+              title={`Adicionar subtópico em ${node.name}`}
+              className={`opacity-0 group-hover:opacity-100 p-0.5 rounded transition-opacity ${
+                isActive
+                  ? 'hover:bg-stone-800 text-stone-300'
+                  : 'hover:bg-stone-200 text-stone-500'
+              }`}
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          )}
 
           {/* Contador de posts */}
           {typeof node.total_post_count === 'number' && node.total_post_count > 0 && (
@@ -162,14 +164,16 @@ export default function TreeView({
             Árvore de Conhecimento
           </span>
         </div>
-        <button
-          onClick={() => onOpenNewTopicModal(null)}
-          className="inline-flex items-center gap-1 text-[11px] font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-          title="Criar novo tópico raiz"
-        >
-          <Plus className="w-3 h-3" />
-          <span>Novo Tópico</span>
-        </button>
+        {onOpenNewTopicModal && (
+          <button
+            onClick={() => onOpenNewTopicModal(null)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+            title="Criar novo tópico raiz"
+          >
+            <Plus className="w-3 h-3" />
+            <span>Novo Tópico</span>
+          </button>
+        )}
       </div>
 
       {/* Item Raiz "Todos os Tópicos" */}

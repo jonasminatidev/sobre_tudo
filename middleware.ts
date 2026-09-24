@@ -15,30 +15,32 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Public routes
-  const isAuthRoute = pathname === '/api/auth/login';
   const isLoginPage = pathname === '/login';
-
   const token = request.cookies.get('auth_token')?.value;
   const session = token ? await verifyJwt(token) : null;
 
-  // If user is logged in and trying to visit /login, redirect to homepage
-  if (isLoginPage && session) {
-    return NextResponse.redirect(new URL('/', request.url));
+  // If user is accessing /login, redirect to /admin
+  if (isLoginPage) {
+    return NextResponse.redirect(new URL('/admin', request.url));
   }
 
-  // If user is not logged in and trying to access a protected page
-  if (!session && !isLoginPage && !isAuthRoute) {
-    // If it's an API route, return 401 Unauthorized
+  // Public GET endpoints and public pages (/ , /admin, /post/[id])
+  const isPublicPage = pathname === '/' || pathname === '/admin' || pathname.startsWith('/post/');
+  const isPublicApi = pathname.startsWith('/api/') && (request.method === 'GET' || pathname.startsWith('/api/auth/'));
+
+  if (isPublicPage || isPublicApi) {
+    return NextResponse.next();
+  }
+
+  // Protected routes (/novo, /post/[id]/editar, POST/PUT/DELETE API endpoints)
+  if (!session) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
         { error: 'Não autorizado. Por favor faça login.' },
         { status: 401 }
       );
     }
-    // Otherwise redirect to login page
-    const loginUrl = new URL('/login', request.url);
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(new URL('/admin', request.url));
   }
 
   return NextResponse.next();

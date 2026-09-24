@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-function HomeContent() {
+export function HomeContent({ isAdmin = false }: { isAdmin?: boolean }) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -135,16 +135,18 @@ function HomeContent() {
     } else {
       params.delete('topic_id');
     }
-    router.push(`/?${params.toString()}`);
+    router.push(isAdmin ? `/admin?${params.toString()}` : `/?${params.toString()}`);
   };
 
   const handleOpenNewModal = (parentId: string | null = null) => {
+    if (!isAdmin) return;
     setTopicToEdit(null);
     setModalParentId(parentId !== undefined ? parentId : activeTopicId);
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (targetId?: string) => {
+    if (!isAdmin) return;
     const topicIdToUse = targetId || activeTopicId;
     if (!topicIdToUse) return;
 
@@ -162,7 +164,7 @@ function HomeContent() {
   };
 
   const handleDeleteTopic = async () => {
-    if (!activeTopicDetail) return;
+    if (!isAdmin || !activeTopicDetail) return;
     const confirmDelete = confirm(
       `Tem certeza que deseja excluir o tópico "${activeTopicDetail.name}"? Todas as anotações e subtópicos associados serão removidos.`
     );
@@ -194,7 +196,7 @@ function HomeContent() {
           tree={tree}
           activeTopicId={activeTopicId}
           onSelectTopic={handleSelectTopic}
-          onOpenNewTopicModal={handleOpenNewModal}
+          onOpenNewTopicModal={isAdmin ? handleOpenNewModal : undefined}
         />
       </div>
 
@@ -220,7 +222,8 @@ function HomeContent() {
               onClick={() => {
                 const params = new URLSearchParams(searchParams.toString());
                 params.delete('search');
-                router.push(params.toString() ? `/?${params.toString()}` : '/');
+                const basePath = isAdmin ? '/admin' : '/';
+                router.push(params.toString() ? `${basePath}?${params.toString()}` : basePath);
               }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-stone-700 hover:text-stone-900 border border-stone-200 text-xs font-semibold shadow-2xs transition-colors shrink-0 cursor-pointer"
             >
@@ -278,45 +281,47 @@ function HomeContent() {
               </p>
             </div>
 
-            {/* Ações do Tópico */}
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              {activeTopicDetail && (
-                <>
-                  <button
-                    onClick={() => handleOpenEditModal(activeTopicDetail.id)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-md text-xs font-semibold transition-all cursor-pointer border border-white/20"
-                    title="Editar nome, cor ou capa deste tópico"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Editar Tópico</span>
-                  </button>
+            {/* Ações do Tópico (Somente em Modo Admin) */}
+            {isAdmin && (
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {activeTopicDetail && (
+                  <>
+                    <button
+                      onClick={() => handleOpenEditModal(activeTopicDetail.id)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-md text-xs font-semibold transition-all cursor-pointer border border-white/20"
+                      title="Editar nome, cor ou capa deste tópico"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Editar Tópico</span>
+                    </button>
 
-                  <button
-                    onClick={handleDeleteTopic}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white backdrop-blur-md text-xs font-semibold transition-all cursor-pointer border border-white/20"
-                    title="Excluir este tópico"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </>
-              )}
+                    <button
+                      onClick={handleDeleteTopic}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white backdrop-blur-md text-xs font-semibold transition-all cursor-pointer border border-white/20"
+                      title="Excluir este tópico"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
 
-              <button
-                onClick={() => handleOpenNewModal(activeTopicId)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-md text-xs font-semibold transition-all cursor-pointer border border-white/20"
-              >
-                <FolderPlus className="w-4 h-4" />
-                <span>+ Novo Subtópico</span>
-              </button>
+                <button
+                  onClick={() => handleOpenNewModal(activeTopicId)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-md text-xs font-semibold transition-all cursor-pointer border border-white/20"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  <span>+ Novo Subtópico</span>
+                </button>
 
-              <Link
-                href={activeTopicId ? `/novo?topic_id=${activeTopicId}` : '/novo'}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-stone-900 text-xs font-bold shadow-md hover:bg-stone-100 active:scale-[0.98] transition-all"
-              >
-                <FilePlus className="w-4 h-4" />
-                <span>Criar Anotação Aqui</span>
-              </Link>
-            </div>
+                <Link
+                  href={activeTopicId ? `/novo?topic_id=${activeTopicId}` : '/novo'}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-stone-900 text-xs font-bold shadow-md hover:bg-stone-100 active:scale-[0.98] transition-all"
+                >
+                  <FilePlus className="w-4 h-4" />
+                  <span>Criar Anotação Aqui</span>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
 
@@ -328,12 +333,14 @@ function HomeContent() {
                 <Layers className="w-4 h-4 text-stone-400" />
                 <span>Todos os Tópicos Principais ({tree.length})</span>
               </h3>
-              <button
-                onClick={() => handleOpenNewModal(null)}
-                className="text-xs font-semibold text-stone-700 hover:text-stone-900 hover:underline"
-              >
-                + Criar Tópico Raiz
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => handleOpenNewModal(null)}
+                  className="text-xs font-semibold text-stone-700 hover:text-stone-900 hover:underline cursor-pointer"
+                >
+                  + Criar Tópico Raiz
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -347,7 +354,7 @@ function HomeContent() {
                   postCount={cat.total_post_count || 0}
                   subtopicCount={cat.children ? cat.children.length : 0}
                   onSelect={handleSelectTopic}
-                  onEdit={(id, e) => handleOpenEditModal(id)}
+                  onEdit={isAdmin ? (id, e) => handleOpenEditModal(id) : undefined}
                 />
               ))}
             </div>
@@ -372,7 +379,7 @@ function HomeContent() {
                   postCount={child.total_post_count || child.direct_post_count || 0}
                   subtopicCount={child.children ? child.children.length : 0}
                   onSelect={handleSelectTopic}
-                  onEdit={(id, e) => handleOpenEditModal(id)}
+                  onEdit={isAdmin ? (id, e) => handleOpenEditModal(id) : undefined}
                 />
               ))}
             </div>
@@ -425,42 +432,48 @@ function HomeContent() {
               {activeTopicDetail ? `Nenhuma anotação em "${activeTopicDetail.name}"` : 'Nenhuma anotação encontrada'}
             </h3>
             <p className="mt-1 text-xs text-stone-500 max-w-sm mx-auto">
-              Você pode adicionar anotações neste tópico ou criar subtópicos para organizar seus estudos.
+              {isAdmin
+                ? 'Você pode adicionar anotações neste tópico ou criar subtópicos para organizar seus estudos.'
+                : 'Nenhum conteúdo publicado nesta categoria até o momento.'}
             </p>
-            <div className="mt-5 flex justify-center gap-3">
-              <button
-                onClick={() => handleOpenNewModal(activeTopicId)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-100 text-stone-800 text-xs font-semibold hover:bg-stone-200 transition-colors"
-              >
-                <FolderPlus className="w-4 h-4" />
-                <span>Criar Subtópico</span>
-              </button>
+            {isAdmin && (
+              <div className="mt-5 flex justify-center gap-3">
+                <button
+                  onClick={() => handleOpenNewModal(activeTopicId)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-100 text-stone-800 text-xs font-semibold hover:bg-stone-200 transition-colors cursor-pointer"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  <span>Criar Subtópico</span>
+                </button>
 
-              <Link
-                href={activeTopicId ? `/novo?topic_id=${activeTopicId}` : '/novo'}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800 transition-colors shadow-2xs"
-              >
-                <FilePlus className="w-4 h-4" />
-                <span>Criar Anotação Aqui</span>
-              </Link>
-            </div>
+                <Link
+                  href={activeTopicId ? `/novo?topic_id=${activeTopicId}` : '/novo'}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800 transition-colors shadow-2xs"
+                >
+                  <FilePlus className="w-4 h-4" />
+                  <span>Criar Anotação Aqui</span>
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Modal para criar / editar tópico */}
-      <NewTopicModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        defaultParentId={modalParentId}
-        topicToEdit={topicToEdit}
-        tree={tree}
-        onTopicSaved={(savedTopicId) => {
-          fetchTree();
-          fetchTopicDetail();
-          handleSelectTopic(savedTopicId);
-        }}
-      />
+      {/* Modal para criar / editar tópico (Apenas em Modo Admin) */}
+      {isAdmin && (
+        <NewTopicModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          defaultParentId={modalParentId}
+          topicToEdit={topicToEdit}
+          tree={tree}
+          onTopicSaved={(savedTopicId) => {
+            fetchTree();
+            fetchTopicDetail();
+            handleSelectTopic(savedTopicId);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -468,7 +481,7 @@ function HomeContent() {
 export default function HomePage() {
   return (
     <Suspense fallback={<div className="p-8 text-center text-stone-500">Carregando caderno digital...</div>}>
-      <HomeContent />
+      <HomeContent isAdmin={false} />
     </Suspense>
   );
 }
